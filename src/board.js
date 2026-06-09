@@ -54,7 +54,9 @@ export function createBoard(handlers) {
         if (hasNotes) for (let n = 1; n <= 9; n++) noteEls[n - 1].textContent = (s.notes[i] & (1 << n)) ? n : '';
       }
       const isUser = !s.given[i] && !s.hinted[i] && !!v;
-      const isWrong = isUser && s.solution[i] && v !== s.solution[i];
+      // "Equivocado vs la solución" solo tiene sentido si la solución es única;
+      // si no, solo los conflictos de regla (duplicados) marcan error.
+      const isWrong = s.unique && isUser && s.solution[i] && v !== s.solution[i];
       cell.classList.toggle('given', s.given[i] === 1);
       cell.classList.toggle('hinted', s.hinted[i] === 1);
       cell.classList.toggle('user', isUser);

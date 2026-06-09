@@ -1,14 +1,18 @@
 // Modelo de la partida y operaciones puras sobre el estado. Nada de DOM aquí.
 import {
-  generate, solve, decodeGivens, encodeGivens, conflicts, isComplete, peers,
+  generate, solve, countSolutions, decodeGivens, encodeGivens, conflicts, isComplete, peers,
 } from './sudoku.js';
 
-function buildState({ puzzle, solution, difficulty, seed, source, daily }) {
+function buildState({ puzzle, solution, difficulty, seed, source, daily, unique }) {
   return {
     difficulty,
     seed: seed || 0,
     source: source || 'normal',     // 'normal' | 'daily' | 'shared'
     daily: daily || null,           // YYYYMMDD si es reto diario
+    // ¿solución ÚNICA? Solo entonces "no coincide con la solución" es un error real.
+    // Los niveles/diario generados siempre son únicos; un enlace #g= hecho a mano
+    // podría no serlo, y ahí solo cuentan los errores de REGLA (duplicados).
+    unique: unique !== false,
     given: puzzle.map(v => (v ? 1 : 0)),
     hinted: new Array(81).fill(0),  // 1 = celda revelada por pista (bloqueada)
     cells: puzzle.slice(),          // valores actuales (0 = vacío)
@@ -42,11 +46,13 @@ export function gameFromGivens(givens, opts = {}) {
   const board = decodeGivens(givens);
   if (!board) return null;
   if (conflicts(board).size) return null;     // givens inconsistentes
+  const count = countSolutions(board, 2);     // 0 = sin solución, 1 = única, 2+ = varias
+  if (count === 0) return null;               // no se puede resolver → rechazar
   const solution = solve(board);
-  if (!solution) return null;                 // sin solución
+  if (!solution) return null;
   return buildState({
     puzzle: board, solution, difficulty: opts.difficulty || 'custom',
-    seed: 0, source: 'shared',
+    seed: 0, source: 'shared', unique: count === 1,
   });
 }
 
@@ -80,7 +86,8 @@ export function inputDigit(s, v) {
   pushHistory(s, i);
   s.cells[i] = v;
   s.notes[i] = 0;
-  if (s.solution[i] && v !== s.solution[i]) s.mistakes++;
+  // Solo cuenta como error contra la solución si el puzzle es de solución única.
+  if (s.unique && s.solution[i] && v !== s.solution[i]) s.mistakes++;
   else clearPeerNotes(s, i, v);
   if (isComplete(s.cells)) s.completed = true;
   return true;
@@ -145,7 +152,7 @@ export function restart(s) {
 // Serializa lo necesario para reanudar (arrays planos; sin métodos).
 export function serialize(s) {
   return {
-    difficulty: s.difficulty, seed: s.seed, source: s.source, daily: s.daily,
+    difficulty: s.difficulty, seed: s.seed, source: s.source, daily: s.daily, unique: s.unique,
     given: s.given, hinted: s.hinted, cells: s.cells, solution: s.solution,
     notes: s.notes, selected: s.selected, notesMode: s.notesMode,
     mistakes: s.mistakes, hintsUsed: s.hintsUsed,
@@ -157,7 +164,7 @@ export function deserialize(o) {
   if (!o || !Array.isArray(o.cells) || o.cells.length !== 81) return null;
   return {
     difficulty: o.difficulty || 'medium', seed: o.seed || 0,
-    source: o.source || 'normal', daily: o.daily || null,
+    source: o.source || 'normal', daily: o.daily || null, unique: o.unique !== false,
     given: o.given, hinted: o.hinted || new Array(81).fill(0),
     cells: o.cells, solution: o.solution, notes: o.notes || new Array(81).fill(0),
     selected: typeof o.selected === 'number' ? o.selected : -1,

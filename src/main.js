@@ -328,11 +328,14 @@ function startDaily() {
 }
 function startShared(givens) {
   const g = gameFromGivens(givens);
-  if (!g) { showToast(t('custom')); renderMap(); return; }
+  if (!g) { showToast(t('badLink')); renderMap(); return; }
   game = g;
   game.ctx = { kind: 'shared', givens };
   game.selected = firstEmpty(game);
   openGame();
+  // Aviso transparente: si el enlace trae un puzzle con varias soluciones, solo se
+  // marcan los errores de regla (no hay una solución única contra la cual comparar).
+  if (!game.unique) showToast(t('multiSolution'));
 }
 function firstEmpty(g) { for (let i = 0; i < 81; i++) if (!g.cells[i]) return i; return -1; }
 

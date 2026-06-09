@@ -43,6 +43,8 @@ const DICT = {
     confirmNewTitle: '¿Abandonar la partida?',
     confirmNewBody: 'Tienes una partida en curso; si sales se guarda para reanudar.',
     linkCopied: '¡Enlace copiado!',
+    badLink: 'Ese enlace no tiene un Sudoku válido.',
+    multiSolution: 'Este puzzle tiene varias soluciones; solo se marcan los errores de regla.',
   },
   en: {
     brand: 'Sudoku',
@@ -81,6 +83,8 @@ const DICT = {
     confirmNewTitle: 'Leave the game?',
     confirmNewBody: 'You have a game in progress; leaving saves it so you can resume.',
     linkCopied: 'Link copied!',
+    badLink: "That link isn't a valid Sudoku.",
+    multiSolution: 'This puzzle has multiple solutions; only rule errors are flagged.',
   },
 };
 
