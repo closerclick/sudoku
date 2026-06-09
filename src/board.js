@@ -36,7 +36,9 @@ export function createBoard(handlers) {
   function update(s) {
     const conf = conflicts(s.cells);
     const sel = s.selected;
-    const selVal = sel >= 0 ? s.cells[sel] : 0;
+    // Resaltar el número "en la mano" (modo número primero); si no hay, el de la
+    // casilla seleccionada.
+    const activeV = s.activeDigit || (sel >= 0 ? s.cells[sel] : 0);
     const peerSet = sel >= 0 ? peers(sel) : null;
 
     for (let i = 0; i < 81; i++) {
@@ -51,7 +53,18 @@ export function createBoard(handlers) {
         val.style.display = 'none';
         const hasNotes = !!s.notes[i];
         notes.style.display = hasNotes ? '' : 'none';
-        if (hasNotes) for (let n = 1; n <= 9; n++) noteEls[n - 1].textContent = (s.notes[i] & (1 << n)) ? n : '';
+        if (hasNotes) {
+          // dígitos ya usados por los pares (fila/col/caja) → nota ILEGAL (roja)
+          let used = 0;
+          for (const p of peers(i)) { const pv = s.cells[p]; if (pv) used |= 1 << pv; }
+          for (let n = 1; n <= 9; n++) {
+            const on = s.notes[i] & (1 << n);
+            const el = noteEls[n - 1];
+            el.textContent = on ? n : '';
+            el.classList.toggle('bad', !!on && !!(used & (1 << n)));   // candidato imposible
+            el.classList.toggle('hi', !!on && n === activeV);          // resalta el nº en la mano
+          }
+        }
       }
       const isUser = !s.given[i] && !s.hinted[i] && !!v;
       // "Equivocado vs la solución" solo tiene sentido si la solución es única;
@@ -63,7 +76,7 @@ export function createBoard(handlers) {
       cell.classList.toggle('wrong', isWrong);
       cell.classList.toggle('selected', i === sel);
       cell.classList.toggle('peer', peerSet ? peerSet.has(i) : false);
-      cell.classList.toggle('same', !!v && v === selVal && i !== sel);
+      cell.classList.toggle('same', !!v && v === activeV && i !== sel);
       cell.classList.toggle('conflict', conf.has(i));
     }
 
@@ -73,6 +86,7 @@ export function createBoard(handlers) {
       const { btn, count } = padBtns[n - 1];
       count.textContent = remaining > 0 ? remaining : '';
       btn.classList.toggle('done', remaining <= 0);
+      btn.classList.toggle('active', n === s.activeDigit);   // dígito "en la mano"
     }
     pad.classList.toggle('notes-mode', s.notesMode);
   }

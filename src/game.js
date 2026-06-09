@@ -19,6 +19,8 @@ function buildState({ puzzle, solution, difficulty, seed, source, daily, unique 
     solution: solution.slice(),
     notes: new Array(81).fill(0),   // bitmask de marcas a lápiz (bit v = 1<<v)
     selected: -1,
+    activeDigit: 0,                 // dígito "en la mano" (modo número primero)
+    eraseMode: false,              // goma activada: tocar una casilla la borra
     notesMode: false,
     mistakes: 0,
     hintsUsed: 0,                   // pistas usadas en ESTA partida (para las estrellas)
@@ -71,10 +73,10 @@ function clearPeerNotes(s, i, v) {
   for (const p of peers(i)) if (s.notes[p] & bit) s.notes[p] &= ~bit;
 }
 
-// Coloca un dígito (1..9) en la celda seleccionada, o togglea nota si notesMode.
-// Devuelve true si la jugada cambió el tablero.
-export function inputDigit(s, v) {
-  const i = s.selected;
+// Núcleo común: coloca/alterna el valor v en la celda i. En notesMode alterna la
+// nota; fuera de notas, si la celda ya tiene v lo BORRA (tocar otra vez = quitar).
+// Devuelve true si cambió el tablero.
+function putValue(s, i, v) {
   if (i < 0 || locked(s, i) || s.completed) return false;
   if (s.notesMode) {
     if (s.cells[i]) return false;             // no hay notas sobre un valor
@@ -82,7 +84,11 @@ export function inputDigit(s, v) {
     s.notes[i] ^= (1 << v);
     return true;
   }
-  if (s.cells[i] === v) return false;         // mismo valor → no-op
+  if (s.cells[i] === v) {                      // mismo valor → quitar
+    pushHistory(s, i);
+    s.cells[i] = 0;
+    return true;
+  }
   pushHistory(s, i);
   s.cells[i] = v;
   s.notes[i] = 0;
@@ -93,8 +99,32 @@ export function inputDigit(s, v) {
   return true;
 }
 
-export function erase(s) {
-  const i = s.selected;
+// Teclado: escribe el dígito en la celda seleccionada (modo casilla primero).
+export function inputDigit(s, v) { return putValue(s, s.selected, v); }
+
+// Modo NÚMERO PRIMERO: elige el dígito "en la mano" (toca el mismo para soltarlo).
+// Elegir un dígito apaga la goma.
+export function setActiveDigit(s, v) {
+  s.activeDigit = s.activeDigit === v ? 0 : v;
+  if (s.activeDigit) s.eraseMode = false;
+  return s.activeDigit;
+}
+
+// Goma como TOGGLE: encendida, tocar una casilla la borra. Apaga el dígito activo.
+export function setEraseMode(s) {
+  s.eraseMode = !s.eraseMode;
+  if (s.eraseMode) s.activeDigit = 0;
+  return s.eraseMode;
+}
+
+// Aplica el dígito en la mano a la celda i (al tocar una casilla). Sin dígito
+// activo no hace nada (solo se seleccionó la casilla).
+export function applyActiveDigit(s, i) {
+  return s.activeDigit ? putValue(s, i, s.activeDigit) : false;
+}
+
+// Borra la casilla i: quita el valor Y todas sus notas.
+export function eraseAt(s, i) {
   if (i < 0 || locked(s, i) || s.completed) return false;
   if (!s.cells[i] && !s.notes[i]) return false;
   pushHistory(s, i);
@@ -102,6 +132,7 @@ export function erase(s) {
   s.notes[i] = 0;
   return true;
 }
+export function erase(s) { return eraseAt(s, s.selected); }
 
 export function undo(s) {
   if (s.completed || !s.history.length) return false;
@@ -168,6 +199,7 @@ export function deserialize(o) {
     given: o.given, hinted: o.hinted || new Array(81).fill(0),
     cells: o.cells, solution: o.solution, notes: o.notes || new Array(81).fill(0),
     selected: typeof o.selected === 'number' ? o.selected : -1,
+    activeDigit: 0, eraseMode: false,
     notesMode: !!o.notesMode, mistakes: o.mistakes || 0,
     hintsUsed: o.hintsUsed || 0,
     elapsedMs: o.elapsedMs || 0, completed: !!o.completed,

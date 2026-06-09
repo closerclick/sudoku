@@ -148,8 +148,10 @@ button { font-family: inherit; cursor: pointer; }
 }
 .cell .note {
   display: flex; align-items: center; justify-content: center;
-  font-size: clamp(.42rem, 1.8vw, .62rem); font-weight: 600; color: var(--note); line-height: 1;
+  font-size: clamp(.5rem, 2.3vw, .72rem); font-weight: 700; color: var(--note); line-height: 1;
 }
+.cell .note.hi { color: var(--accent-2); }     /* nota del número "en la mano" */
+.cell .note.bad { color: var(--danger); }       /* candidato imposible (ya está en fila/col/caja) */
 
 /* ---------- Controles ---------- */
 .controls { display: flex; gap: 10px; width: min(94vw, 60vh, 460px); margin: 0 auto; justify-content: space-between; }
@@ -184,6 +186,10 @@ button { font-family: inherit; cursor: pointer; }
 }
 .pad-btn.done { opacity: .4; }
 .pad.notes-mode .pad-btn { border-color: var(--accent); color: var(--accent-2); }
+/* Dígito "en la mano" (modo número primero): resaltado y relleno. */
+.pad-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
+.pad-btn.active .pad-n, .pad-btn.active .pad-count { color: #fff; }
+.pad.notes-mode .pad-btn.active { background: var(--accent); color: #fff; }
 
 @media (max-width: 380px) {
   .pad { gap: 4px; }

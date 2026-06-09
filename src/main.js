@@ -2,11 +2,11 @@ import './style.css';
 import { h, clear } from './dom.js';
 import { t, getLang, setLang } from './i18n.js';
 import {
-  newGame, gameFromGivens, select, inputDigit, erase, undo, hint, toggleNotes,
-  serialize, deserialize,
+  newGame, gameFromGivens, select, inputDigit, erase, eraseAt, undo, hint, toggleNotes,
+  setActiveDigit, setEraseMode, applyActiveDigit, serialize, deserialize,
 } from './game.js';
 import {
-  saveGame, loadGame, clearGame, loadProgress, saveProgress,
+  loadSaves, saveSaves, loadProgress, saveProgress,
 } from './store.js';
 import {
   allNodes, nodeById, edges, maxRow, regions, totalStars, maxStars, nodeStars,
@@ -77,10 +77,10 @@ function ensureGameTutorial() {
     steps: [
       { id: 'play', target: '[data-testid="board"]', placement: 'top',
         title: { es: 'Cómo jugar', en: 'How to play' },
-        text: { es: 'Toca una casilla vacía y luego un número. Tus números van en azul; las pistas impresas, en blanco. Si te equivocas, la casilla se pone roja.', en: 'Tap an empty cell, then a number. Your numbers are blue; printed clues are white. Wrong entries turn red.' } },
+        text: { es: 'Elige un número y toca las casillas para colocarlo; tócala otra vez con el mismo número para borrarlo, o usa la goma. Tus números van en azul, las pistas en blanco y los errores en rojo.', en: 'Pick a number, then tap cells to place it; tap again with the same number to remove it, or use the eraser. Your numbers are blue, clues white, mistakes red.' } },
       { id: 'notes', target: '[data-testid="tool-notes"]', placement: 'top',
         title: { es: 'Notas', en: 'Notes' },
-        text: { es: 'Activa las notas para anotar varios candidatos pequeños en una casilla.', en: 'Turn on notes to pencil small candidates into a cell.' } },
+        text: { es: 'Activa las notas, elige un número y tócalo en las casillas como candidato. Los candidatos imposibles salen en rojo.', en: 'Turn on notes, pick a number and tap cells to pencil it as a candidate. Impossible candidates show in red.' } },
       { id: 'hint', target: '[data-testid="tool-hint"]', placement: 'top',
         title: { es: 'Pistas', en: 'Hints' },
         text: { es: 'Una pista revela una casilla. El número es tu saldo: consigues más pistas compartiendo niveles.', en: 'A hint reveals a cell. The number is your balance: get more hints by sharing levels.' } },
@@ -92,6 +92,7 @@ function ensureGameTutorial() {
 }
 
 let progress = {};
+let saves = { map: {}, last: null };   // partidas en curso por nivel (reanudar)
 let game = null;          // estado de la partida actual (o null)
 let board = null;         // controlador del tablero (perezoso)
 let view = 'map';         // 'map' | 'game'
@@ -132,10 +133,38 @@ function coinFloating() {
 }
 
 // ---------- Persistencia ----------
+// Clave estable por partida: nivel (nodo), reto diario o puzzle compartido.
+function ctxKey(ctx) {
+  if (!ctx) return 'X';
+  if (ctx.kind === 'daily') return 'D:' + ctx.date;
+  if (ctx.kind === 'shared') return 'S:' + ctx.givens;
+  return 'L:' + ctx.nodeId;
+}
 function persistGame() {
   if (!game) return;
+  const key = ctxKey(game.ctx);
+  saves.map[key] = { ...serialize(game), ctx: game.ctx };
+  saves.last = key;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => { saveGame({ ...serialize(game), ctx: game.ctx }).catch(() => {}); }, 350);
+  saveTimer = setTimeout(() => { saveSaves(saves).catch(() => {}); }, 350);
+}
+// Al resolver un nivel ya no se reanuda: se borra su partida guardada.
+function clearSave(key) {
+  if (saves.map[key]) {
+    delete saves.map[key];
+    if (saves.last === key) saves.last = null;
+    saveSaves(saves).catch(() => {});
+  }
+}
+function lastSave() { return saves.last ? saves.map[saves.last] : null; }
+function resumeRecord(rec, ctx) {
+  game = deserialize(rec);
+  if (!game) return false;
+  game.ctx = ctx || rec.ctx;
+  game.paused = false;
+  if (game.selected < 0) game.selected = firstEmpty(game);
+  openGame();
+  return true;
 }
 async function persistProgress() { try { await saveProgress(progress); } catch {} }
 
@@ -180,14 +209,15 @@ function renderMap() {
       h('span', { class: 'ic', html: IC.hint }), h('b', { 'data-testid': 'tips-total' }, String(hintsBalance()))),
   );
 
-  // tarjeta de partida en curso (reanudar)
+  // tarjeta de partida en curso (reanudar la última jugada)
   const cards = h('div', { class: 'map-cards' });
-  if (game && !game.completed && game.ctx) {
+  const ls = lastSave();
+  if (ls && !ls.completed) {
     cards.append(h('button', {
-      class: 'card resume', 'data-testid': 'resume', onclick: () => openGame(),
+      class: 'card resume', 'data-testid': 'resume', onclick: () => resumeRecord(ls),
     },
       h('span', { class: 'ic', html: IC.play }),
-      h('div', { class: 'card-txt' }, h('b', {}, t('resumeGame')), h('span', { class: 'muted' }, ctxLabel(game.ctx) + ' · ' + fmtTime(game.elapsedMs))),
+      h('div', { class: 'card-txt' }, h('b', {}, t('resumeGame')), h('span', { class: 'muted' }, ctxLabel(ls.ctx) + ' · ' + fmtTime(ls.elapsedMs))),
     ));
   }
   // reto diario
@@ -313,24 +343,35 @@ function langSelector(after) {
 function startNode(id) {
   const n = nodeById(id);
   if (!n || !isUnlocked(progress, id)) return;
+  const ctx = { kind: 'level', nodeId: id, boss: n.type === 'boss', region: n.region };
+  const saved = saves.map['L:' + id];
+  // Reanudar el nivel lleno si quedó a medias; si no, generarlo nuevo.
+  if (saved && !saved.completed && resumeRecord(saved, ctx)) return;
   game = newGame(n.spec, n.seed, { source: 'normal', label: n.diff });
-  game.ctx = { kind: 'level', nodeId: id, boss: n.type === 'boss', region: n.region };
+  game.ctx = ctx;
   game.selected = firstEmpty(game);
   openGame();
 }
 function startDaily() {
   if ((progress.daily || {}).last === todayKey()) return;
+  const date = todayKey();
+  const ctx = { kind: 'daily', date };
+  const saved = saves.map['D:' + date];
+  if (saved && !saved.completed && resumeRecord(saved, ctx)) return;
   const diff = dailyDifficulty();
-  game = newGame(diff, todayKey(), { source: 'daily', daily: todayKey(), label: diff });
-  game.ctx = { kind: 'daily', date: todayKey() };
+  game = newGame(diff, date, { source: 'daily', daily: date, label: diff });
+  game.ctx = ctx;
   game.selected = firstEmpty(game);
   openGame();
 }
 function startShared(givens) {
+  const ctx = { kind: 'shared', givens };
+  const saved = saves.map['S:' + givens];
+  if (saved && !saved.completed && resumeRecord(saved, ctx)) return;
   const g = gameFromGivens(givens);
   if (!g) { showToast(t('badLink')); renderMap(); return; }
   game = g;
-  game.ctx = { kind: 'shared', givens };
+  game.ctx = ctx;
   game.selected = firstEmpty(game);
   openGame();
   // Aviso transparente: si el enlace trae un puzzle con varias soluciones, solo se
@@ -383,7 +424,7 @@ function renderGame() {
 
   const controls = h('div', { class: 'controls' },
     tool('undo', IC.undo, doUndo, { disabled: !game.history.length }),
-    tool('erase', IC.erase, doErase),
+    tool('erase', IC.erase, doErase, { active: game.eraseMode }),
     tool('notes', IC.notes, doToggleNotes, { active: game.notesMode }),
     tool('hint', IC.hint, doHint, { badge: hintsBalance() }),
     tool('share', IC.share, () => shareCurrent(), {}),
@@ -405,13 +446,37 @@ function tool(key, icon, onclick, opts = {}) {
   return btn;
 }
 
-// ---------- Acciones del juego ----------
-function onSelect(i) { if (game.paused) return; select(game, i); board.update(game); persistGame(); }
+// ---------- Acciones del juego (modo NÚMERO PRIMERO) ----------
+// Tocar una casilla: si la goma está activa, la borra; si hay un dígito "en la
+// mano", lo coloca (o lo quita si ya estaba); si no, solo la selecciona.
+function onSelect(i) {
+  if (game.paused || game.completed) return;
+  select(game, i);
+  let changed = false;
+  if (game.eraseMode) changed = eraseAt(game, i);
+  else if (game.activeDigit) changed = applyActiveDigit(game, i);
+  if (changed) afterMove();
+  else { board.update(game); persistGame(); }
+}
+// Tocar un número del teclado: lo toma "en la mano" (toggle). Si ya hay una casilla
+// seleccionada, lo coloca también ahí.
 function onDigit(v) {
   if (game.paused || game.completed) return;
-  if (inputDigit(game, v)) afterMove();
+  setActiveDigit(game, v);
+  let changed = false;
+  if (game.activeDigit && game.selected >= 0) changed = applyActiveDigit(game, game.selected);
+  renderGame();
+  if (changed) { persistGame(); if (game.completed) onWin(); }
 }
-function doErase() { if (game.paused) return; if (erase(game)) afterMove(); }
+// Goma como toggle: la enciende/apaga; si hay casilla seleccionada, la borra ya.
+function doErase() {
+  if (game.paused || game.completed) return;
+  setEraseMode(game);
+  let changed = false;
+  if (game.eraseMode && game.selected >= 0) changed = eraseAt(game, game.selected);
+  renderGame();
+  if (changed) persistGame();
+}
 function doUndo() { if (game.paused) return; if (undo(game)) { renderGame(); persistGame(); } else showToast(t('noUndo')); }
 function doToggleNotes() { if (game.paused) return; toggleNotes(game); renderGame(); persistGame(); }
 function doHint() {
@@ -505,7 +570,7 @@ async function onWin() {
     progress.daily = d;
     await persistProgress();
   }
-  await clearGame();               // partida terminada: ya no se reanuda
+  clearSave(ctxKey(ctx));          // partida terminada: ya no se reanuda
   showWinModal({ ctx, earned, record, regionMsg });
 }
 
@@ -558,9 +623,10 @@ function closeOverlay() { if (overlayEl) { overlayEl.remove(); overlayEl = null;
 //  Teclado
 // =====================================================================
 window.addEventListener('keydown', (e) => {
-  if (view !== 'game' || !game || overlayEl) return;
-  if (e.key >= '1' && e.key <= '9') { onDigit(+e.key); e.preventDefault(); return; }
-  if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') { doErase(); e.preventDefault(); return; }
+  if (view !== 'game' || !game || game.paused || game.completed || overlayEl) return;
+  // Teclado = casilla primero: el dígito escribe en la casilla seleccionada.
+  if (e.key >= '1' && e.key <= '9') { if (inputDigit(game, +e.key)) afterMove(); e.preventDefault(); return; }
+  if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') { if (erase(game)) afterMove(); e.preventDefault(); return; }
   if (e.key === 'n' || e.key === 'N') { doToggleNotes(); return; }
   if (e.key === 'h' || e.key === 'H') { doHint(); return; }
   if (e.key === 'u' || e.key === 'U') { doUndo(); return; }
@@ -572,7 +638,8 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') c = (c + 8) % 9;
   else if (e.key === 'ArrowRight') c = (c + 1) % 9;
   else return;
-  onSelect(r * 9 + c); e.preventDefault();
+  // Las flechas solo NAVEGAN (no pintan aunque haya un dígito en la mano).
+  select(game, r * 9 + c); board.update(game); persistGame(); e.preventDefault();
 });
 
 // guardar/pausar al ocultar la pestaña
@@ -590,24 +657,16 @@ function parseHash() {
 
 async function boot() {
   document.documentElement.lang = getLang();
-  progress = await loadProgress();
+  [progress, saves] = await Promise.all([loadProgress(), loadSaves()]);
   if (typeof progress.hints !== 'number') progress.hints = STARTING_HINTS;
+  if (!saves || !saves.map) saves = { map: {}, last: null };
 
   const givens = parseHash();
   if (givens) { startShared(givens); return; }
 
-  const saved = await loadGame();
-  if (saved && !saved.completed) {
-    const g = deserialize(saved);
-    if (g) {
-      game = g;
-      game.ctx = saved.ctx || { kind: 'level' };
-      game.paused = false;
-      if (game.selected < 0) game.selected = firstEmpty(game);
-      openGame();
-      return;
-    }
-  }
+  // Reanudar la última partida en curso (si quedó a medias).
+  const ls = lastSave();
+  if (ls && !ls.completed && resumeRecord(ls)) return;
   renderMap();
 }
 boot();

@@ -1,11 +1,11 @@
 // Persistencia OBLIGATORIA vía @closerclick/closer-click-store (store.closer.click,
-// §4): la partida en curso (para reanudar) y las estadísticas (mejores tiempos,
-// resueltos, racha) viven en el vault del ecosistema (IndexedDB, cuota grande,
-// sync opcional cifrado a Drive). Si el iframe del store no carga (offline /
-// bloqueado), caemos a un shim sobre localStorage para no perder funcionalidad
-// (la app debe andar sin conexión). localStorage queda solo para prefs de UI.
+// §4): las partidas en curso por nivel (para reanudar) y el progreso (estrellas,
+// mejores tiempos, pistas, racha diaria) viven en el vault del ecosistema
+// (IndexedDB, cuota grande, sync opcional cifrado a Drive). Si el iframe del store
+// no carga (offline / bloqueado), caemos a un shim sobre localStorage para no
+// perder funcionalidad. localStorage queda solo para prefs de UI (idioma).
 
-const THREAD_GAME = 'sudoku.current';
+const THREAD_GAME = 'sudoku.saves';   // mapa de partidas en curso por nivel
 const THREAD_PROGRESS = 'sudoku.progress';
 
 let backendPromise = null;
@@ -47,54 +47,25 @@ async function getBackend() {
 
 export async function storeKind() { return (await getBackend()).kind; }
 
-// --- Partida en curso (un único registro, se sobrescribe) ---
-export async function saveGame(game) {
-  const b = await getBackend();
-  try { await b.removeThread(THREAD_GAME); } catch {}
-  await b.appendMessage(THREAD_GAME, { id: 'game', ts: Date.now(), game });
-}
-
-export async function loadGame() {
+// --- Partidas en curso, una por NIVEL (mapa key→partida + último jugado) ---
+// Se guarda TODO el objeto de saves en un único registro (se sobrescribe). Así,
+// salir de un nivel y volver lo reanuda lleno hasta resolverlo.
+export async function loadSaves() {
   const b = await getBackend();
   try {
     const entries = await b.listThread(THREAD_GAME, { limit: 1 });
     if (entries && entries.length) {
       const last = entries[entries.length - 1];
-      if (last && last.game) return last.game;
+      if (last && last.saves) return last.saves;
     }
   } catch {}
-  return null;
+  return { map: {}, last: null };
 }
 
-export async function clearGame() {
+export async function saveSaves(saves) {
   const b = await getBackend();
   try { await b.removeThread(THREAD_GAME); } catch {}
-}
-
-// --- Estadísticas (un único registro, se sobrescribe) ---
-const EMPTY_STATS = () => ({
-  best: {},          // dificultad → mejor tiempo en ms
-  solved: {},        // dificultad → cantidad resuelta
-  totalSolved: 0,
-  daily: { last: null, streak: 0 }, // último reto diario resuelto (YYYYMMDD) y racha
-});
-
-export async function loadStats() {
-  const b = await getBackend();
-  try {
-    const entries = await b.listThread(THREAD_STATS, { limit: 1 });
-    if (entries && entries.length) {
-      const last = entries[entries.length - 1];
-      if (last && last.stats) return { ...EMPTY_STATS(), ...last.stats };
-    }
-  } catch {}
-  return EMPTY_STATS();
-}
-
-export async function saveStats(stats) {
-  const b = await getBackend();
-  try { await b.removeThread(THREAD_STATS); } catch {}
-  await b.appendMessage(THREAD_STATS, { id: 'stats', ts: Date.now(), stats });
+  await b.appendMessage(THREAD_GAME, { id: 'saves', ts: Date.now(), saves });
 }
 
 // --- Progreso de la aventura (mapa de niveles: estrellas por nodo) ---
