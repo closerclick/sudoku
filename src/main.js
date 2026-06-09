@@ -461,15 +461,11 @@ function onSelect(i) {
 // seleccionada, lo coloca también ahí.
 function onDigit(v) {
   if (game.paused || game.completed) return;
+  // Elegir un número SOLO lo toma "en la mano" (pen). Nunca modifica una casilla:
+  // ni valores ni notas cambian al cambiar de número. Colocar/anotar/borrar es
+  // SIEMPRE tocando la casilla. Así notas y asignación funcionan igual.
   setActiveDigit(game, v);
-  let changed = false;
-  // Rellena la casilla seleccionada SOLO si está vacía. Cambiar de número NUNCA
-  // pisa lo ya puesto: para cambiar una casilla hay que TOCARLA a propósito.
-  if (game.activeDigit && game.selected >= 0 && !game.cells[game.selected] && !game.given[game.selected]) {
-    changed = applyActiveDigit(game, game.selected);
-  }
   renderGame();
-  if (changed) { persistGame(); if (game.completed) onWin(); }
 }
 // Goma como toggle puro: solo enciende/apaga; borrar requiere tocar la casilla.
 function doErase() {

@@ -105,6 +105,25 @@ test('notas: candidato imposible se marca en rojo', async ({ page }) => {
   await expect(note).toHaveClass(/bad/)
 })
 
+test('notas: cambiar de número NO toca las notas ya puestas', async ({ page }) => {
+  await open(page); await startLevel(page)
+  const [a, b] = await emptyEditable(page)
+  const note = (i, n) => page.locator(`[data-testid="cell-${i}"] .notes`).locator('.note').nth(n - 1)
+  await page.locator('[data-testid="tool-notes"]').click()
+  await page.locator('[data-testid="num-3"]').click()
+  await page.locator(`[data-testid="cell-${a}"]`).click()           // nota 3 en a
+  await expect(note(a, 3)).toHaveText('3')
+  // cambiar de número NO debe alterar las notas de a
+  await page.locator('[data-testid="num-5"]').click()
+  await expect(note(a, 3)).toHaveText('3')
+  await expect(note(a, 5)).toHaveText('')
+  // anotar en otra casilla funciona; a sigue intacta
+  await page.locator(`[data-testid="cell-${b}"]`).click()
+  await expect(note(b, 5)).toHaveText('5')
+  await expect(note(a, 3)).toHaveText('3')
+  await expect(note(a, 5)).toHaveText('')
+})
+
 test('persistencia por nivel: salir y volver mantiene lo puesto', async ({ page }) => {
   // n0 está siempre desbloqueado (en un contexto de test el progreso arranca vacío).
   await open(page); await startLevel(page, 'n0')
