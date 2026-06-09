@@ -7,12 +7,13 @@
   --line: #2a3656;          /* líneas finas del tablero */
   --line-strong: #4a64a0;   /* separadores de cajas 3×3 */
   --cell-bg: #121a30;
+  --cell-given-bg: #202c4d;   /* pistas (givens) sobre fondo más claro = "impresas" */
   --text: #e6ecfb;
   --muted: #8b97b8;
   --accent: #3b82f6;
   --accent-2: #60a5fa;
-  --given: #dfe6f5;
-  --user: #6ea8ff;
+  --given: #f3f6ff;           /* pista: blanco y en negrita */
+  --user: #54a0ff;            /* tu número: azul, más fino */
   --note: #7c89ad;
   --danger: #f87171;
   --ok: #34d399;
@@ -125,11 +126,17 @@ button { font-family: inherit; cursor: pointer; }
   font-size: clamp(1.1rem, 5.2vw, 1.7rem); font-weight: 600; color: var(--user);
   cursor: pointer; transition: background .1s;
 }
-.cell.given { color: var(--given); font-weight: 800; cursor: default; }
+/* Pistas (no editables): fondo más claro + blanco en negrita → claramente
+   distintas de las que pones tú (azules, sobre el fondo oscuro de la celda). */
+.cell.given { background: var(--cell-given-bg); color: var(--given); font-weight: 800; cursor: default; }
+.cell.user { color: var(--user); font-weight: 600; }
 .cell.hinted { color: var(--ok); font-weight: 700; }
 .cell.peer { background: #161f3a; }
+.cell.given.peer { background: #2a3a63; }
 .cell.same { background: #1d2c52; }
 .cell.selected { background: color-mix(in srgb, var(--accent) 42%, var(--cell-bg)); }
+/* Número equivocado (no coincide con la solución): rojo, para saber cuál borrar. */
+.cell.wrong { color: var(--danger); font-weight: 700; }
 .cell.conflict { color: var(--danger); }
 .cell.conflict.selected { background: color-mix(in srgb, var(--danger) 38%, var(--cell-bg)); }
 .cell .val { z-index: 2; line-height: 1; }

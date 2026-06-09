@@ -8,16 +8,44 @@
 // la siguiente región. El seed por nodo es DETERMINISTA: el mismo nodo es el mismo
 // puzzle para todos, y un nivel se puede compartir por #fragment.
 
-// Región: dificultad de sus niveles, dificultad del jefe, y puerta de estrellas
-// (total de estrellas para poder entrar a la región y para enfrentar al jefe).
+// Región: etiqueta de dificultad, puertas de estrellas (entrar / jefe) y la RAMPA.
+// Cada nivel se gradúa por TÉCNICA: `max`/`min` = técnica humana permitida (1 single
+// desnudo … 5 trío, 99 avanzado). La región EASY es de iniciación: niveles "casi
+// completos" → se cava por TOPE DE HUECOS `caps[depth]` (9, 16, 24…) y solo singles.
+// Las demás cavan HONDO hasta exigir su técnica → se controla por `minClues[depth]`
+// (menos pistas = más difícil). El jefe sube un escalón respecto a su región.
+//   depth 0 = entrada, 1 = ramas fila 1, 2 = ramas fila 2.
 const REGIONS = [
-  { key: 'easy',   bossKey: 'medium', gate: 0,  bossGate: 6  },
-  { key: 'medium', bossKey: 'hard',   gate: 9,  bossGate: 20 },
-  { key: 'hard',   bossKey: 'expert', gate: 24, bossGate: 38 },
-  { key: 'expert', bossKey: 'expert', gate: 44, bossGate: 60 },
+  { key: 'easy', bossKey: 'medium', gate: 0, bossGate: 6,
+    normal: { max: 2, min: 1, caps: [9, 16, 24] },          // casi completos, solo singles
+    boss:   { max: 2, min: 1, cap: 30 } },
+  { key: 'medium', bossKey: 'hard', gate: 9, bossGate: 20,
+    normal: { max: 3, min: 2, minClues: [34, 32, 31] },     // singles + candidatos bloqueados, sin pares
+    boss:   { max: 4, min: 2, minClues: 30 } },
+  { key: 'hard', bossKey: 'expert', gate: 24, bossGate: 38,
+    normal: { max: 99, min: 3, minClues: [28, 27, 26] },    // candidatos bloqueados / pares, menos pistas
+    boss:   { max: 99, min: 3, minClues: 25 } },
+  { key: 'expert', bossKey: 'expert', gate: 44, bossGate: 60,
+    normal: { max: 99, min: 4, minClues: [24, 23, 23] },    // pares en adelante / búsqueda, mínimas pistas
+    boss:   { max: 99, min: 4, minClues: 22 } },
 ];
 
 const seedFor = (idx) => (100003 + idx * 7919) >>> 0;
+
+// Spec de generación de un nivel: técnica + (tope de huecos | suelo de pistas).
+function normalSpec(reg, depth) {
+  const n = reg.normal;
+  const s = { maxLevel: n.max, minLevel: n.min };
+  if (n.caps) s.cap = n.caps[depth];           // iniciación: casi completo
+  else s.minClues = n.minClues[depth];         // difícil: cava hondo
+  return s;
+}
+function bossSpec(reg) {
+  const b = reg.boss;
+  const s = { maxLevel: b.max, minLevel: b.min };
+  if (b.cap != null) s.cap = b.cap; else s.minClues = b.minClues;
+  return s;
+}
 
 // Construye el grafo una sola vez (es estático).
 function build() {
@@ -25,28 +53,28 @@ function build() {
   let idx = 0, row = 0, prevBoss = null;
 
   const add = (n) => { nodes.push(n); idx++; return n.id; };
-  const mk = (type, diff, x, requires, requireMode, gate, region, label) => ({
-    id: 'n' + idx, type, diff, x, row, seed: seedFor(idx),
-    requires, requireMode, gate, region, label,
+  const mk = (type, reg, x, requires, requireMode, gate, region, label, spec) => ({
+    id: 'n' + idx, type, diff: type === 'boss' ? reg.bossKey : reg.key,
+    x, row, seed: seedFor(idx), requires, requireMode, gate, region, label, spec,
   });
 
   REGIONS.forEach((reg, ri) => {
     // Entrada de la región (abre con su puerta de estrellas + jefe anterior vencido)
-    const entry = mk('normal', reg.key, 0.5,
-      prevBoss ? [prevBoss] : [], 'all', reg.gate, ri, 1);
+    const entry = mk('normal', reg, 0.5, prevBoss ? [prevBoss] : [], 'all', reg.gate, ri, 1, normalSpec(reg, 0));
     add(entry); row++;
 
     // Bifurcación: dos ramas paralelas desde la entrada (caminos alternativos)
-    const L1 = mk('normal', reg.key, 0.24, [entry.id], 'all', 0, ri, 2); add(L1);
-    const R1 = mk('normal', reg.key, 0.76, [entry.id], 'all', 0, ri, 2); add(R1);
+    const L1 = mk('normal', reg, 0.24, [entry.id], 'all', 0, ri, 2, normalSpec(reg, 1)); add(L1);
+    const R1 = mk('normal', reg, 0.76, [entry.id], 'all', 0, ri, 2, normalSpec(reg, 1)); add(R1);
     row++;
-    const L2 = mk('normal', reg.key, 0.24, [L1.id], 'all', 0, ri, 3); add(L2);
-    const R2 = mk('normal', reg.key, 0.76, [R1.id], 'all', 0, ri, 3); add(R2);
+    const L2 = mk('normal', reg, 0.24, [L1.id], 'all', 0, ri, 3, normalSpec(reg, 2)); add(L2);
+    const R2 = mk('normal', reg, 0.76, [R1.id], 'all', 0, ri, 3, normalSpec(reg, 2)); add(R2);
     row++;
 
     // El jefe une las dos ramas: basta despejar UNA para enfrentarlo, pero la otra
-    // da más estrellas. Exige su puerta de estrellas (las estrellas como llave).
-    const boss = mk('boss', reg.bossKey, 0.5, [L2.id, R2.id], 'any', reg.bossGate, ri, 0);
+    // da más estrellas. Exige su puerta de estrellas (las estrellas como llave) y
+    // sube un escalón de dificultad respecto a la región.
+    const boss = mk('boss', reg, 0.5, [L2.id, R2.id], 'any', reg.bossGate, ri, 0, bossSpec(reg));
     add(boss); row++;
 
     prevBoss = boss.id;

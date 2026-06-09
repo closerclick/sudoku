@@ -25,11 +25,15 @@ function buildState({ puzzle, solution, difficulty, seed, source, daily }) {
   };
 }
 
-export function newGame(difficulty, seed, opts = {}) {
-  const g = generate(difficulty, seed);
+// `spec` puede ser un nombre de banda ('easy'..'expert') o un objeto por nivel
+// ({ maxLevel, minLevel, holes }); `opts.label` es la etiqueta de dificultad que
+// se muestra (easy/medium/hard/expert) y se usa para las estrellas/HUD.
+export function newGame(spec, seed, opts = {}) {
+  const g = generate(spec, seed);
   return buildState({
-    puzzle: g.puzzle, solution: g.solution, difficulty, seed: g.seed,
-    source: opts.source || 'normal', daily: opts.daily || null,
+    puzzle: g.puzzle, solution: g.solution,
+    difficulty: opts.label || (typeof spec === 'string' ? spec : 'medium'),
+    seed: g.seed, source: opts.source || 'normal', daily: opts.daily || null,
   });
 }
 

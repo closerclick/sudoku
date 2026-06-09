@@ -53,9 +53,12 @@ export function createBoard(handlers) {
         notes.style.display = hasNotes ? '' : 'none';
         if (hasNotes) for (let n = 1; n <= 9; n++) noteEls[n - 1].textContent = (s.notes[i] & (1 << n)) ? n : '';
       }
+      const isUser = !s.given[i] && !s.hinted[i] && !!v;
+      const isWrong = isUser && s.solution[i] && v !== s.solution[i];
       cell.classList.toggle('given', s.given[i] === 1);
       cell.classList.toggle('hinted', s.hinted[i] === 1);
-      cell.classList.toggle('user', !s.given[i] && !s.hinted[i] && !!v);
+      cell.classList.toggle('user', isUser);
+      cell.classList.toggle('wrong', isWrong);
       cell.classList.toggle('selected', i === sel);
       cell.classList.toggle('peer', peerSet ? peerSet.has(i) : false);
       cell.classList.toggle('same', !!v && v === selVal && i !== sel);

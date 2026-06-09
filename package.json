@@ -13,7 +13,8 @@
     "@closerclick/closer-click-install": "0.1.1",
     "@closerclick/closer-click-nav": "0.2.0",
     "@closerclick/closer-click-share": "0.3.0",
-    "@closerclick/closer-click-store": "^0.3.0"
+    "@closerclick/closer-click-store": "^0.3.0",
+    "@closerclick/closer-click-tutorial": "0.1.1"
   },
   "devDependencies": {
     "vite": "^7.3.1"

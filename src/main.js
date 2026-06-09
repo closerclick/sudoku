@@ -15,6 +15,7 @@ import {
 } from './levels.js';
 import { createBoard } from './board.js';
 import { createBackNav } from '@closerclick/closer-click-nav';
+import { createTutorial } from '@closerclick/closer-click-tutorial';
 import '@closerclick/closer-click-install';
 import '@closerclick/closer-click-share';
 
@@ -51,6 +52,44 @@ app.append(shareEl);
 
 const nav = createBackNav();
 let gameLayer = null;
+let mapTour = null, gameTour = null;
+
+// Tutorial guiado (burbujas del ecosistema, una sola vez). Una tanda en el mapa
+// y otra la primera vez que entras a una partida; comparten storageKey.
+function ensureMapTutorial() {
+  if (mapTour) return;
+  mapTour = createTutorial({
+    lang: getLang(), storageKey: 'sudoku.tutorial', startDelay: 350,
+    steps: [
+      { id: 'stars', target: '[data-testid="stars-total"]', placement: 'bottom',
+        title: { es: 'Estrellas', en: 'Stars' },
+        text: { es: 'Ganas estrellas al completar niveles (1 a 3 según tu rendimiento). Son la llave para abrir jefes y nuevas regiones.', en: 'Earn stars by completing levels (1–3 by performance). They are the key to unlock bosses and new regions.' } },
+      { id: 'pick', target: '[data-testid="node-n0"]', placement: 'top',
+        title: { es: 'Empieza aquí', en: 'Start here' },
+        text: { es: 'Toca el primer nivel para jugar. El mapa sube: avanzas hacia arriba por caminos que se bifurcan y enfrentas jefes.', en: 'Tap the first level to play. The map climbs upward along branching paths toward bosses.' } },
+    ],
+  });
+}
+function ensureGameTutorial() {
+  if (gameTour) return;
+  gameTour = createTutorial({
+    lang: getLang(), storageKey: 'sudoku.tutorial', startDelay: 350,
+    steps: [
+      { id: 'play', target: '[data-testid="board"]', placement: 'top',
+        title: { es: 'Cómo jugar', en: 'How to play' },
+        text: { es: 'Toca una casilla vacía y luego un número. Tus números van en azul; las pistas impresas, en blanco. Si te equivocas, la casilla se pone roja.', en: 'Tap an empty cell, then a number. Your numbers are blue; printed clues are white. Wrong entries turn red.' } },
+      { id: 'notes', target: '[data-testid="tool-notes"]', placement: 'top',
+        title: { es: 'Notas', en: 'Notes' },
+        text: { es: 'Activa las notas para anotar varios candidatos pequeños en una casilla.', en: 'Turn on notes to pencil small candidates into a cell.' } },
+      { id: 'hint', target: '[data-testid="tool-hint"]', placement: 'top',
+        title: { es: 'Pistas', en: 'Hints' },
+        text: { es: 'Una pista revela una casilla. El número es tu saldo: consigues más pistas compartiendo niveles.', en: 'A hint reveals a cell. The number is your balance: get more hints by sharing levels.' } },
+      { id: 'share', target: '[data-testid="tool-share"]', placement: 'top',
+        title: { es: 'Reta a un amigo', en: 'Challenge a friend' },
+        text: { es: 'Comparte este nivel: tu amigo juega el mismo reto y tú ganas una pista.', en: 'Share this level: your friend plays the same puzzle and you earn a hint.' } },
+    ],
+  });
+}
 
 let progress = {};
 let game = null;          // estado de la partida actual (o null)
@@ -170,6 +209,15 @@ function renderMap() {
 
   clear(screen).append(top, starsBar, cards, mapWrap);
   coinInTopbar(top.querySelector('.actions'));
+
+  // El mapa sube: enfocar el nodo actual (o el fondo, donde está el nivel 1) para
+  // que el jugador vea dónde está sin tener que desplazarse.
+  requestAnimationFrame(() => {
+    const nextEl = screen.querySelector('.node-wrap.next') || screen.querySelector('.node-wrap.done:last-of-type');
+    if (nextEl) nextEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+    else window.scrollTo(0, document.body.scrollHeight);
+    ensureMapTutorial();
+  });
 }
 
 function ctxLabel(ctx) {
@@ -193,7 +241,9 @@ function renderMapGraph() {
   svg.setAttribute('width', MAP_W); svg.setAttribute('height', H);
   svg.setAttribute('viewBox', `0 0 ${MAP_W} ${H}`);
   const cx = n => n.x * MAP_W;
-  const cy = n => PAD_Y + n.row * ROW_H;
+  // El mapa SUBE: el nivel 1 (row 0) queda abajo y se asciende hacia las regiones
+  // más difíciles arriba. Se invierte la fila respecto al total.
+  const cy = n => PAD_Y + (rows - 1 - n.row) * ROW_H;
   for (const [a, b] of edges()) {
     const na = nodeById(a), nb = nodeById(b);
     const line = document.createElementNS(ns, 'line');
@@ -263,14 +313,15 @@ function langSelector(after) {
 function startNode(id) {
   const n = nodeById(id);
   if (!n || !isUnlocked(progress, id)) return;
-  game = newGame(n.diff, n.seed, { source: 'normal' });
+  game = newGame(n.spec, n.seed, { source: 'normal', label: n.diff });
   game.ctx = { kind: 'level', nodeId: id, boss: n.type === 'boss', region: n.region };
   game.selected = firstEmpty(game);
   openGame();
 }
 function startDaily() {
   if ((progress.daily || {}).last === todayKey()) return;
-  game = newGame(dailyDifficulty(), todayKey(), { source: 'daily', daily: todayKey() });
+  const diff = dailyDifficulty();
+  game = newGame(diff, todayKey(), { source: 'daily', daily: todayKey(), label: diff });
   game.ctx = { kind: 'daily', date: todayKey() };
   game.selected = firstEmpty(game);
   openGame();
@@ -296,6 +347,7 @@ function openGame() {
   renderGame();
   startTimer();
   persistGame();
+  ensureGameTutorial();
   // capa de navegación: el botón físico "atrás" vuelve al mapa
   if (!gameLayer) gameLayer = nav.open(() => renderMap());
 }
