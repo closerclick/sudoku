@@ -162,7 +162,7 @@ function resumeRecord(rec, ctx) {
   if (!game) return false;
   game.ctx = ctx || rec.ctx;
   game.paused = false;
-  if (game.selected < 0) game.selected = firstEmpty(game);
+  game.activeDigit = 0; game.eraseMode = false;   // sin pen/goma colgando al reanudar
   openGame();
   return true;
 }
@@ -349,7 +349,7 @@ function startNode(id) {
   if (saved && !saved.completed && resumeRecord(saved, ctx)) return;
   game = newGame(n.spec, n.seed, { source: 'normal', label: n.diff });
   game.ctx = ctx;
-  game.selected = firstEmpty(game);
+  game.selected = -1;   // sin casilla preseleccionada: número primero limpio
   openGame();
 }
 function startDaily() {
@@ -361,7 +361,7 @@ function startDaily() {
   const diff = dailyDifficulty();
   game = newGame(diff, date, { source: 'daily', daily: date, label: diff });
   game.ctx = ctx;
-  game.selected = firstEmpty(game);
+  game.selected = -1;   // sin casilla preseleccionada: número primero limpio
   openGame();
 }
 function startShared(givens) {
@@ -372,13 +372,12 @@ function startShared(givens) {
   if (!g) { showToast(t('badLink')); renderMap(); return; }
   game = g;
   game.ctx = ctx;
-  game.selected = firstEmpty(game);
+  game.selected = -1;   // sin casilla preseleccionada: número primero limpio
   openGame();
   // Aviso transparente: si el enlace trae un puzzle con varias soluciones, solo se
   // marcan los errores de regla (no hay una solución única contra la cual comparar).
   if (!game.unique) showToast(t('multiSolution'));
 }
-function firstEmpty(g) { for (let i = 0; i < 81; i++) if (!g.cells[i]) return i; return -1; }
 
 // =====================================================================
 //  Vista de juego
@@ -464,18 +463,19 @@ function onDigit(v) {
   if (game.paused || game.completed) return;
   setActiveDigit(game, v);
   let changed = false;
-  if (game.activeDigit && game.selected >= 0) changed = applyActiveDigit(game, game.selected);
+  // Rellena la casilla seleccionada SOLO si está vacía. Cambiar de número NUNCA
+  // pisa lo ya puesto: para cambiar una casilla hay que TOCARLA a propósito.
+  if (game.activeDigit && game.selected >= 0 && !game.cells[game.selected] && !game.given[game.selected]) {
+    changed = applyActiveDigit(game, game.selected);
+  }
   renderGame();
   if (changed) { persistGame(); if (game.completed) onWin(); }
 }
-// Goma como toggle: la enciende/apaga; si hay casilla seleccionada, la borra ya.
+// Goma como toggle puro: solo enciende/apaga; borrar requiere tocar la casilla.
 function doErase() {
   if (game.paused || game.completed) return;
   setEraseMode(game);
-  let changed = false;
-  if (game.eraseMode && game.selected >= 0) changed = eraseAt(game, game.selected);
   renderGame();
-  if (changed) persistGame();
 }
 function doUndo() { if (game.paused) return; if (undo(game)) { renderGame(); persistGame(); } else showToast(t('noUndo')); }
 function doToggleNotes() { if (game.paused) return; toggleNotes(game); renderGame(); persistGame(); }
