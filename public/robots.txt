@@ -1,0 +1,8 @@
+# Solo la cáscara pública de la herramienta es indexable.
+# Las partidas del usuario (tablero, progreso, tiempos) viven en su navegador /
+# store.closer.click y los puzzles compartidos viajan por #fragment; nunca llegan
+# al servidor ni son indexables, y así debe seguir.
+User-agent: *
+Allow: /
+
+Sitemap: https://sudoku.closer.click/sitemap.xml

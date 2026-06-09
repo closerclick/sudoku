@@ -1,0 +1,21 @@
+{
+  "name": "sudoku",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Sudoku del ecosistema CloserClick (Vite, sin framework). Generador determinista por semilla, 4 dificultades, reto diario, notas, pistas y persistencia en tu store.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@closerclick/closer-click-install": "0.1.1",
+    "@closerclick/closer-click-nav": "0.2.0",
+    "@closerclick/closer-click-share": "0.3.0",
+    "@closerclick/closer-click-store": "^0.3.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
+  }
+}

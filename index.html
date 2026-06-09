@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sudoku">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Sudoku — juega, reto diario y comparte puzzles</title>
+<meta name="description" content="Sudoku gratis con generador propio de solución única: cuatro dificultades (fácil, medio, difícil y experto), reto diario, notas a lápiz, pistas, detección de errores, deshacer y cronómetro. Reanuda tu partida, guarda tus mejores tiempos y comparte un puzzle por enlace. PWA instalable, funciona sin conexión y sin trackers." />
+<link rel="canonical" href="https://sudoku.closer.click/" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="es_ES" />
+<meta property="og:site_name" content="Closer Click" />
+<meta property="og:title" content="Sudoku" />
+<meta property="og:description" content="Sudoku con 4 dificultades, reto diario, notas, pistas, deshacer y cronómetro. Reanuda tu partida y comparte un puzzle por enlace. Sin conexión y sin trackers." />
+<meta property="og:url" content="https://sudoku.closer.click/" />
+<meta property="og:image" content="https://sudoku.closer.click/og.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Sudoku" />
+<meta name="twitter:description" content="Sudoku con 4 dificultades, reto diario, notas, pistas y cronómetro. Comparte un puzzle por enlace. Funciona sin conexión." />
+<meta name="twitter:image" content="https://sudoku.closer.click/og.jpg" />
+<!-- Analítica cookieless autohosteada (GoatCounter); no cuenta en localhost/LAN. -->
+<script>window.goatcounter={path:function(p){return location.hostname+p}}</script>
+<script data-goatcounter="https://goat.closer.click/count" async src="https://goat.closer.click/count.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Sudoku",
+  "url": "https://sudoku.closer.click/",
+  "description": "Sudoku con generador propio de solución única, cuatro dificultades, reto diario, notas, pistas, deshacer y cronómetro. Funciona sin conexión.",
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Web",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "publisher": { "@type": "Organization", "name": "Closer Click", "url": "https://closer.click/" }
+}
+</script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@closerclick/closer-click-support@0.3/src/index.js"></script>
+</body>
+</html>
