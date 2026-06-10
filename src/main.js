@@ -465,12 +465,14 @@ function onDigit(v) {
   // ni valores ni notas cambian al cambiar de número. Colocar/anotar/borrar es
   // SIEMPRE tocando la casilla. Así notas y asignación funcionan igual.
   setActiveDigit(game, v);
+  select(game, -1);   // sin casilla enfocada: cambiar de número no deja fondos colgando
   renderGame();
 }
 // Goma como toggle puro: solo enciende/apaga; borrar requiere tocar la casilla.
 function doErase() {
   if (game.paused || game.completed) return;
   setEraseMode(game);
+  select(game, -1);
   renderGame();
 }
 function doUndo() { if (game.paused) return; if (undo(game)) { renderGame(); persistGame(); } else showToast(t('noUndo')); }

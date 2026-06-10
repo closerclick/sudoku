@@ -105,6 +105,28 @@ test('notas: candidato imposible se marca en rojo', async ({ page }) => {
   await expect(note).toHaveClass(/bad/)
 })
 
+test('cambiar de número no deja fondos colgando (sin casilla enfocada)', async ({ page }) => {
+  await open(page); await startLevel(page)
+  const [a] = await emptyEditable(page)
+  // tocar una casilla la enfoca (selected + peers)
+  await page.locator(`[data-testid="cell-${a}"]`).click()
+  // cambiar de número debe limpiar el enfoque: ninguna casilla con .selected ni .peer
+  await page.locator('[data-testid="num-3"]').click()
+  const counts = await page.evaluate(() => ({
+    selected: document.querySelectorAll('.cell.selected').length,
+    peer: document.querySelectorAll('.cell.peer').length,
+  }))
+  expect(counts.selected).toBe(0)
+  expect(counts.peer).toBe(0)
+  // solo se resaltan (same) las casillas que ya contienen el número activo
+  const same = await page.evaluate(() => {
+    const g = window.__sudoku.getGame()
+    const hl = [...document.querySelectorAll('.cell.same')].map(el => +el.dataset.i)
+    return hl.every(i => g.cells[i] === g.activeDigit)
+  })
+  expect(same).toBe(true)
+})
+
 test('goma: notas y goma son exclusivas y la goma borra valor y notas', async ({ page }) => {
   await open(page); await startLevel(page)
   const [a, b] = await emptyEditable(page)
