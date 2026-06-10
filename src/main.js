@@ -3,7 +3,7 @@ import { h, clear } from './dom.js';
 import { t, getLang, setLang } from './i18n.js';
 import {
   newGame, gameFromGivens, select, inputDigit, erase, eraseAt, undo, hint, toggleNotes,
-  setActiveDigit, setEraseMode, applyActiveDigit, serialize, deserialize,
+  setActiveDigit, setEraseMode, applyActiveDigit, dropAt, serialize, deserialize,
 } from './game.js';
 import {
   loadSaves, saveSaves, loadProgress, saveProgress,
@@ -386,7 +386,7 @@ function openGame() {
   view = 'game';
   document.body.classList.add('mode-game');
   coinFloating();
-  if (!board) board = createBoard({ onSelect: onSelect, onDigit: onDigit });
+  if (!board) board = createBoard({ onSelect: onSelect, onDigit: onDigit, onDrop: onDrop });
   renderGame();
   startTimer();
   persistGame();
@@ -467,6 +467,16 @@ function onDigit(v) {
   setActiveDigit(game, v);
   select(game, -1);   // sin casilla enfocada: cambiar de número no deja fondos colgando
   renderGame();
+}
+// Soltar un número arrastrado sobre una casilla: lo coloca y lo deja "en la mano".
+function onDrop(i, v) {
+  if (game.paused || game.completed) return;
+  game.eraseMode = false;
+  game.activeDigit = v;            // el número soltado queda en la mano
+  const changed = dropAt(game, i, v);
+  select(game, i);
+  renderGame();
+  if (changed) { persistGame(); if (game.completed) onWin(); }
 }
 // Goma como toggle puro: solo enciende/apaga; borrar requiere tocar la casilla.
 function doErase() {

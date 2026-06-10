@@ -132,6 +132,26 @@ export function applyActiveDigit(s, i) {
   return s.activeDigit ? putValue(s, i, s.activeDigit) : false;
 }
 
+// Soltar (drag & drop) el dígito v sobre la casilla i: en notas alterna la nota;
+// si no, COLOCA el valor (reemplaza). Arrastrar nunca borra (no es toggle).
+export function dropAt(s, i, v) {
+  if (i < 0 || locked(s, i) || s.completed) return false;
+  if (s.notesMode) {
+    if (s.cells[i]) return false;
+    pushHistory(s, i);
+    s.notes[i] ^= (1 << v);
+    return true;
+  }
+  if (s.cells[i] === v) return false;          // ya está ese número → no-op
+  pushHistory(s, i);
+  s.cells[i] = v;
+  s.notes[i] = 0;
+  if (s.unique && s.solution[i] && v !== s.solution[i]) s.mistakes++;
+  else clearPeerNotes(s, i, v);
+  if (isComplete(s.cells)) s.completed = true;
+  return true;
+}
+
 // Borra la casilla i: quita el valor Y todas sus notas.
 export function eraseAt(s, i) {
   if (i < 0 || locked(s, i) || s.completed) return false;

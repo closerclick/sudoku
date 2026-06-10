@@ -105,6 +105,19 @@ test('notas: candidato imposible se marca en rojo', async ({ page }) => {
   await expect(note).toHaveClass(/bad/)
 })
 
+test('drag & drop: arrastrar un número a una casilla lo coloca', async ({ page }) => {
+  await open(page); await startLevel(page)
+  const [a] = await emptyEditable(page)
+  const pb = await page.locator('[data-testid="num-4"]').boundingBox()
+  const cb = await page.locator(`[data-testid="cell-${a}"]`).boundingBox()
+  await page.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(pb.x + pb.width / 2 + 14, pb.y + pb.height / 2 + 14)  // supera el umbral
+  await page.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2, { steps: 6 })
+  await page.mouse.up()
+  expect((await cells(page))[a]).toBe(4)
+})
+
 test('cambiar de número no deja fondos colgando (sin casilla enfocada)', async ({ page }) => {
   await open(page); await startLevel(page)
   const [a] = await emptyEditable(page)

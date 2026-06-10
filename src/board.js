@@ -21,14 +21,63 @@ export function createBoard(handlers) {
     grid.append(cell);
   }
 
+  // --- Arrastrar (drag & drop) números del teclado a las casillas ---
+  // Basado en pointer events → funciona con ratón Y con el dedo (táctil).
+  let drag = null;        // { v, x0, y0, moved, ghost }
+  let justDragged = false; // suprime el click que sigue a un arrastre
+  const cellUnder = (x, y) => { const el = document.elementFromPoint(x, y); return el ? el.closest('.cell') : null; };
+  const clearDropTarget = () => { const t = grid.querySelector('.cell.drop-target'); if (t) t.classList.remove('drop-target'); };
+  function endDrag() {
+    if (drag && drag.ghost) drag.ghost.remove();
+    clearDropTarget();
+    document.body.classList.remove('dragging-num');
+    drag = null;
+  }
+
   const padBtns = [];
   const pad = h('div', { class: 'pad', 'data-testid': 'pad' });
   for (let n = 1; n <= 9; n++) {
     const count = h('span', { class: 'pad-count' });
     const btn = h('button', {
       class: 'pad-btn', 'data-n': n, 'data-testid': 'num-' + n, 'aria-label': String(n),
-      onclick: () => handlers.onDigit(n),
+      onclick: () => { if (justDragged) { justDragged = false; return; } handlers.onDigit(n); },
     }, h('span', { class: 'pad-n' }, String(n)), count);
+
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      justDragged = false;
+      drag = { v: n, x0: e.clientX, y0: e.clientY, moved: false, ghost: null };
+      try { btn.setPointerCapture(e.pointerId); } catch {}
+    });
+    btn.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      if (!drag.moved) {
+        if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 8) return;
+        drag.moved = true;
+        drag.ghost = h('div', { class: 'num-ghost' }, String(drag.v));
+        document.body.appendChild(drag.ghost);
+        document.body.classList.add('dragging-num');
+      }
+      drag.ghost.style.left = e.clientX + 'px';
+      drag.ghost.style.top = e.clientY + 'px';
+      clearDropTarget();
+      const cell = cellUnder(e.clientX, e.clientY);
+      if (cell) cell.classList.add('drop-target');
+      e.preventDefault();
+    });
+    btn.addEventListener('pointerup', (e) => {
+      if (!drag) return;
+      if (drag.moved) {
+        const cell = cellUnder(e.clientX, e.clientY);
+        if (cell && cell.dataset.i != null) handlers.onDrop(+cell.dataset.i, drag.v);
+        justDragged = true;
+        e.preventDefault();
+      }
+      try { btn.releasePointerCapture(e.pointerId); } catch {}
+      endDrag();
+    });
+    btn.addEventListener('pointercancel', endDrag);
+
     padBtns.push({ btn, count });
     pad.append(btn);
   }

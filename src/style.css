@@ -190,6 +190,19 @@ button { font-family: inherit; cursor: pointer; }
 .pad-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .pad-btn.active .pad-n, .pad-btn.active .pad-count { color: #fff; }
 .pad.notes-mode .pad-btn.active { background: var(--accent); color: #fff; }
+.pad-btn { touch-action: none; }   /* arrastrar el número sin que la página scrollee */
+
+/* Fantasma que sigue al dedo/ratón al arrastrar un número */
+.num-ghost {
+  position: fixed; z-index: 95; pointer-events: none;
+  transform: translate(-50%, -150%);
+  width: 46px; height: 46px; border-radius: 12px;
+  background: var(--accent); color: #fff; font-weight: 800; font-size: 1.5rem;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 20px rgba(0,0,0,.5);
+}
+/* Casilla bajo el número arrastrado */
+.cell.drop-target { background: color-mix(in srgb, var(--accent) 60%, var(--cell-bg)) !important; }
 
 @media (max-width: 380px) {
   .pad { gap: 4px; }
