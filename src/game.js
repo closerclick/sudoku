@@ -20,6 +20,7 @@ function buildState({ puzzle, solution, difficulty, seed, source, daily, unique 
     notes: new Array(81).fill(0),   // bitmask de marcas a lápiz (bit v = 1<<v)
     selected: -1,
     activeDigit: 0,                 // dígito "en la mano" (modo número primero)
+    prevDigit: 0,                   // número recordado mientras la goma está activa
     eraseMode: false,              // goma activada: tocar una casilla la borra
     notesMode: false,
     mistakes: 0,
@@ -110,10 +111,18 @@ export function setActiveDigit(s, v) {
   return s.activeDigit;
 }
 
-// Goma como TOGGLE: encendida, tocar una casilla la borra. Apaga el dígito activo.
+// Goma como TOGGLE, exclusiva con número y notas. Al ENCENDER recuerda el número
+// que tenías en la mano; al APAGAR lo vuelve a seleccionar (así sigues colocando
+// sin re-elegirlo). Borra siempre valor + notas (ver eraseAt).
 export function setEraseMode(s) {
   s.eraseMode = !s.eraseMode;
-  if (s.eraseMode) s.activeDigit = 0;
+  if (s.eraseMode) {
+    s.prevDigit = s.activeDigit;   // recordar el número en la mano
+    s.activeDigit = 0;
+    s.notesMode = false;           // exclusivo con notas
+  } else {
+    s.activeDigit = s.prevDigit || 0;   // reseleccionar el último número
+  }
   return s.eraseMode;
 }
 
@@ -166,7 +175,11 @@ export function hint(s) {
   return true;
 }
 
-export function toggleNotes(s) { s.notesMode = !s.notesMode; return s.notesMode; }
+export function toggleNotes(s) {
+  s.notesMode = !s.notesMode;
+  if (s.notesMode && s.eraseMode) { s.activeDigit = s.prevDigit || 0; s.eraseMode = false; } // notas apaga la goma
+  return s.notesMode;
+}
 
 // Vuelve el tablero a su estado inicial (solo los givens).
 export function restart(s) {
@@ -199,7 +212,7 @@ export function deserialize(o) {
     given: o.given, hinted: o.hinted || new Array(81).fill(0),
     cells: o.cells, solution: o.solution, notes: o.notes || new Array(81).fill(0),
     selected: typeof o.selected === 'number' ? o.selected : -1,
-    activeDigit: 0, eraseMode: false,
+    activeDigit: 0, prevDigit: 0, eraseMode: false,
     notesMode: !!o.notesMode, mistakes: o.mistakes || 0,
     hintsUsed: o.hintsUsed || 0,
     elapsedMs: o.elapsedMs || 0, completed: !!o.completed,

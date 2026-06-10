@@ -105,6 +105,45 @@ test('notas: candidato imposible se marca en rojo', async ({ page }) => {
   await expect(note).toHaveClass(/bad/)
 })
 
+test('goma: notas y goma son exclusivas y la goma borra valor y notas', async ({ page }) => {
+  await open(page); await startLevel(page)
+  const [a, b] = await emptyEditable(page)
+  const note = (i, n) => page.locator(`[data-testid="cell-${i}"] .notes`).locator('.note').nth(n - 1)
+  // valor en a
+  await page.locator('[data-testid="num-6"]').click()
+  await page.locator(`[data-testid="cell-${a}"]`).click()
+  expect((await cells(page))[a]).toBe(6)
+  // nota en b
+  await page.locator('[data-testid="tool-notes"]').click()
+  await page.locator('[data-testid="num-2"]').click()
+  await page.locator(`[data-testid="cell-${b}"]`).click()
+  await expect(note(b, 2)).toHaveText('2')
+  // encender la goma apaga las notas (exclusivas)
+  await page.locator('[data-testid="tool-erase"]').click()
+  const m = await page.evaluate(() => { const g = window.__sudoku.getGame(); return { notes: g.notesMode, erase: g.eraseMode } })
+  expect(m).toEqual({ notes: false, erase: true })
+  // la goma borra el valor de a y las notas de b
+  await page.locator(`[data-testid="cell-${a}"]`).click()
+  await page.locator(`[data-testid="cell-${b}"]`).click()
+  const c = await cells(page)
+  expect(c[a]).toBe(0)
+  await expect(note(b, 2)).toHaveText('')
+})
+
+test('goma: desactivarla vuelve a seleccionar el último número', async ({ page }) => {
+  await open(page); await startLevel(page)
+  const [a, b] = await emptyEditable(page)
+  await page.locator('[data-testid="num-4"]').click()           // pen = 4
+  await page.locator(`[data-testid="cell-${a}"]`).click()       // a = 4
+  await page.locator('[data-testid="tool-erase"]').click()      // goma ON (guarda 4)
+  expect(await page.evaluate(() => window.__sudoku.getGame().activeDigit)).toBe(0)
+  await page.locator('[data-testid="tool-erase"]').click()      // goma OFF → reselecciona 4
+  expect(await page.evaluate(() => window.__sudoku.getGame().activeDigit)).toBe(4)
+  // y se puede seguir colocando sin re-elegir el número
+  await page.locator(`[data-testid="cell-${b}"]`).click()
+  expect((await cells(page))[b]).toBe(4)
+})
+
 test('notas: cambiar de número NO toca las notas ya puestas', async ({ page }) => {
   await open(page); await startLevel(page)
   const [a, b] = await emptyEditable(page)

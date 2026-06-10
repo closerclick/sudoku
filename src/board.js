@@ -53,17 +53,16 @@ export function createBoard(handlers) {
         val.style.display = 'none';
         const hasNotes = !!s.notes[i];
         notes.style.display = hasNotes ? '' : 'none';
-        if (hasNotes) {
-          // dígitos ya usados por los pares (fila/col/caja) → nota ILEGAL (roja)
-          let used = 0;
-          for (const p of peers(i)) { const pv = s.cells[p]; if (pv) used |= 1 << pv; }
-          for (let n = 1; n <= 9; n++) {
-            const on = s.notes[i] & (1 << n);
-            const el = noteEls[n - 1];
-            el.textContent = on ? n : '';
-            el.classList.toggle('bad', !!on && !!(used & (1 << n)));   // candidato imposible
-            el.classList.toggle('hi', !!on && n === activeV);          // resalta el nº en la mano
-          }
+        // dígitos ya usados por los pares (fila/col/caja) → nota ILEGAL (roja)
+        let used = 0;
+        if (hasNotes) for (const p of peers(i)) { const pv = s.cells[p]; if (pv) used |= 1 << pv; }
+        // Siempre se sincroniza el texto (también al borrar, para no dejar notas viejas).
+        for (let n = 1; n <= 9; n++) {
+          const on = s.notes[i] & (1 << n);
+          const el = noteEls[n - 1];
+          el.textContent = on ? n : '';
+          el.classList.toggle('bad', !!on && !!(used & (1 << n)));   // candidato imposible
+          el.classList.toggle('hi', !!on && n === activeV);          // resalta el nº en la mano
         }
       }
       const isUser = !s.given[i] && !s.hinted[i] && !!v;
